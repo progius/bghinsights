@@ -4,6 +4,16 @@ from pdfminer.high_level import extract_text
 
 
 # THESE REGEX PATTERNS WILL BE USED TO EXTRACT VARIOUS INFORMATIONS IN THE EXTRACTED TEXT
+
+# Regular expression pattern for case number
+case_number_pattern = r"(?:\b[IVXLCDM]*[a-zA-Z]+)?\s?\(?(?:[a-zA-Z]+)\)?\s?\d+/\d+\s?[A-Z]?"
+
+# Regular expression pattern for decision date
+decision_date_pattern = r"(?:Verkündet am:|vom)\s*(\d{1,2}\.\s*(?:Januar|Februar|März|Marz|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s*\d{4})"
+
+# Regular expression pattern for guiding principles (Leitsätze)
+guiding_principles_pattern = r"Nachschlagewerk:"
+
 # Regex pattern to match the different motion categories
 motion_category_pattern = r"(?:Auf die|Die)\s+(Revision|Rechtsbeschwerde|Nichtzulassungsbeschwerde|(?:Beschwerde.*?Nichtzulassung|Beschwerde.*?Revision))"
 
@@ -15,7 +25,8 @@ tenor_pattern = r"(beschlossen:|für Recht erkannt:)\s*(.*?)\s*(Gründe:|Tatbest
 winning_keywords = r"(auf(?:-?\s*)?ge(?:-?\s*)?ho(?:-?\s*)?ben|zu(?:-?\s*)?ge(?:-?\s*)?la(?:-?\s*)?ssen|statt(?:-?\s*)?ge(?:-?\s*)?ge(?:-?\s*)?ben)\b"
 losing_keywords = r"(zu(?:-?\s*)?rück(?:-?\s*)?zu(?:-?\s*)?wei(?:-?\s*)?sen|zu(?:-?\s*)?rück(?:-?\s*)?ge(?:-?\s*)?wie(?:-?\s*)?sen|ab(?:-?\s*)?ge(?:-?\s*)?lehnt|ver(?:-?\s*)?wor(?:-?\s*)?fen)\b"
 
-file_path = "E:/Downloads/iv_zr__69-23.pdf" # this is just a sample file path to test if the code is working properly
+# Test Import
+file_path = "E:/Downloads/vgs___1-16.pdf" # this is just a sample file path to test if the code is working properly
 
 # FUNCTIONS
 # Function to process PDF and extract text from it
@@ -49,7 +60,7 @@ def process_pdf(file_path):
         print(f"Error reading file {file_path}: {e}")
         return None
     
-    print(text)
+    print(text[:1000]) # test print
     return text
 
 process_pdf(file_path)
@@ -104,13 +115,49 @@ def analyze_text_content(text):
             return "Verloren"
         else:
             return "" # Return NONE or empty string if it does not contain any keywords
+        
+    def extract_case_number(text):
+        pattern = re.compile(case_number_pattern, re.IGNORECASE)
+        match = pattern.search(text)
+        if match:
+            return match.group(0)
+        else:
+            return None
+
+    def extract_decision_date(text):
+        pattern = re.compile(decision_date_pattern, re.IGNORECASE)
+        match = pattern.search(text)
+        if match:
+            return match.group(1)
+        else:
+            return None
+
+    def extract_guiding_principles(text):
+        # Define the regular expression pattern to search for guiding principles
+        pattern = re.compile(guiding_principles_pattern, re.IGNORECASE | re.DOTALL)
+        
+        # Search for the pattern in the text
+        match = pattern.search(text)
+        
+        # If a match is found, return "Ja"; otherwise, return "Nein"
+        if match:
+            return "Ja"
+        else:
+            return "Nein"
     
     motion_category = extract_motion_category(text)
     tenor_text = extract_tenor(text)
     court_decision = analyze_court_decision(tenor_text)
+    case_number = extract_case_number(text)
+    decision_date = extract_decision_date(text)
+    guiding_principles = extract_guiding_principles(text)
 
-    print(motion_category)
-    print(court_decision)
+    print("\n")
+    print("Motion Category:", motion_category)
+    print("Court Decision:", court_decision)
+    print("Case Number:", case_number)
+    print("Decision Date:", decision_date)
+    print("Guiding Principles:", guiding_principles)
 
 # Now, let's call the `process_pdf` function to extract text from the PDF and then pass that text to `analyze_text_content` function
 # This is a sample test checker
