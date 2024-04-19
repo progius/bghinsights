@@ -25,6 +25,12 @@ tenor_pattern = r"(beschlossen:|für Recht erkannt:)\s*(.*?)\s*(Gründe:|Tatbest
 winning_keywords = r"(auf(?:-?\s*)?ge(?:-?\s*)?ho(?:-?\s*)?ben|zu(?:-?\s*)?ge(?:-?\s*)?la(?:-?\s*)?ssen|statt(?:-?\s*)?ge(?:-?\s*)?ge(?:-?\s*)?ben)\b"
 losing_keywords = r"(zu(?:-?\s*)?rück(?:-?\s*)?zu(?:-?\s*)?wei(?:-?\s*)?sen|zu(?:-?\s*)?rück(?:-?\s*)?ge(?:-?\s*)?wie(?:-?\s*)?sen|ab(?:-?\s*)?ge(?:-?\s*)?lehnt|ver(?:-?\s*)?wor(?:-?\s*)?fen)\b"
 
+# Define the regular expression pattern
+senat_pattern = r"Große\s+Senat\s+für\s+Zivilsachen|Große\s+Senat\s+für\s+Strafsachen|Kartellsenat|Senat\s+für\s+Notarsachen|Patentanwaltssachen|Senat\s+für\s+Anwaltssachen|Senat\s+für\s+Landwirtschaftssachen|Senat\s+für\s+Wirtschaftsprüfersachen|Senat\s+für\s+Steuerberater-\s+und\s+Steuerbevollmächtigtensachen|Dienstgericht\s+des\s+Bundes|1.\s+Strafsenat|2.\s+Strafsenat|3.\s+Strafsenat|4.\s+Strafsenat|5.\s+Strafsenat|6.\s+Strafsenat|I.\s+Zivilsenat|II.\s+Zivilsenat|III.\s+Zivilsenat|IV.\s+Zivilsenat|V.\s+Zivilsenat|VI.\s+Zivilsenat|VIa.\s+Zivilsenat|VII.\s+Zivilsenat|VIII.\s+Zivilsenat|IX.\s+Zivilsenat|IXa.\s+Zivilsenat|X.\s+Zivilsenat|Xa.\s+Zivilsenat|XI.\s+Zivilsenat|XII.\s+Zivilsenat|XIII.\s+Zivilsenat|Ermittlungsrichter|Vereinigte\s+Große\s+Senate|Senat\s+für\s+Wirtschaftsprüfersachen"
+
+# Compile the regex pattern
+senat_regex = re.compile(senat_pattern)
+
 # Test Import
 file_path = "E:/Downloads/vgs___1-16.pdf" # this is just a sample file path to test if the code is working properly
 
@@ -145,12 +151,20 @@ def analyze_text_content(text):
         else:
             return "Nein"
     
+    def extract_senat(text):
+        match = senat_regex.search(text)
+        if match:
+            return match.group(0).replace('\n', '').replace('  ',' ')
+        else:
+            return None
+    
     motion_category = extract_motion_category(text)
     tenor_text = extract_tenor(text)
     court_decision = analyze_court_decision(tenor_text)
     case_number = extract_case_number(text)
     decision_date = extract_decision_date(text)
     guiding_principles = extract_guiding_principles(text)
+    senat = extract_senat(text)
 
     print("\n")
     print("Motion Category:", motion_category)
@@ -158,6 +172,7 @@ def analyze_text_content(text):
     print("Case Number:", case_number)
     print("Decision Date:", decision_date)
     print("Guiding Principles:", guiding_principles)
+    print("Senat:", senat)
 
 # Now, let's call the `process_pdf` function to extract text from the PDF and then pass that text to `analyze_text_content` function
 # This is a sample test checker
