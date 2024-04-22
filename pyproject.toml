@@ -7,7 +7,9 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-
+pdfminer.six = "^20231228"
+requests= "^2.31.0"
+adlfs = "^2024.4.1"
 
 [build-system]
 requires = ["poetry-core"]
