@@ -1,4 +1,5 @@
 from pdfminer.high_level import extract_text
+import re
 
 # Function to process PDF and extract text from it
 def process_pdf(file_path):
