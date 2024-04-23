@@ -1,5 +1,23 @@
 # IMPORTS
 import re
+from pdf_processor import process_pdf
+from datetime import datetime
+
+# Mapping of German month names to numerical representations
+month_mapping = {
+    "Januar": "01",
+    "Februar": "02",
+    "März": "03",
+    "April": "04",
+    "Mai": "05",
+    "Juni": "06",
+    "Juli": "07",
+    "August": "08",
+    "September": "09",
+    "Oktober": "10",
+    "November": "11",
+    "Dezember": "12"
+}
 
 # THESE REGEX PATTERNS WILL BE USED TO EXTRACT VARIOUS INFORMATIONS IN THE EXTRACTED TEXT
 
@@ -30,9 +48,14 @@ senat_pattern = r"Große\s+Senat\s+für\s+Zivilsachen|Große\s+Senat\s+für\s+St
 senat_regex = re.compile(senat_pattern)
 
 # Function to analyze the extracted text content to extract various pieces of information
-def analyze_text_content(text):
+def analyze_text_content(file_path):
 
-    # implement extraction function for case number, decision date, guiding principles !IMPORTANT!
+    # Process the PDF and extract text
+    text = process_pdf(file_path)
+
+    if not text or not text.strip():
+        print(f"The file {file_path} contains no text or text extraction failed.")
+        return None, None
 
     def extract_motion_category(text):
         pattern = re.compile(motion_category_pattern, re.IGNORECASE | re.DOTALL)
@@ -89,12 +112,37 @@ def analyze_text_content(text):
             return None
 
     def extract_decision_date(text):
-        pattern = re.compile(decision_date_pattern, re.IGNORECASE)
-        match = pattern.search(text)
+        # Define the regular expression pattern for the decision date
+        decision_date_pattern = r"(?:Verkündet am:|vom)\s*(\d{1,2}\.\s*(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s*\d{4})"
+
+        # Search for the decision date pattern in the text
+        match = re.search(decision_date_pattern, text)
+
         if match:
-            return match.group(1)
+            # Extract the decision date string
+            decision_date_str = match.group(1)
+
+            # Convert the month name to its numerical representation
+            for month_name, month_number in month_mapping.items():
+                if month_name in decision_date_str:
+                    decision_date_str = decision_date_str.replace(month_name, month_number)
+                    break
+
+            try:
+                # Parse the decision date string into a datetime object
+                decision_date_obj = datetime.strptime(decision_date_str, "%d. %m %Y")
+
+                # Convert the decision date to UNIX timestamp
+                decision_date_unix = int(decision_date_obj.timestamp())
+            except ValueError:
+                print(f"Error parsing 'decision_date' for file: {file_path}")
+                decision_date_unix = None
         else:
-            return None
+            print(f"No decision date found in the text for file: {file_path}")
+            decision_date_str = None
+            decision_date_unix = None
+
+        return decision_date_str, decision_date_unix
 
     def extract_guiding_principles(text):
         # Define the regular expression pattern to search for guiding principles
@@ -115,3 +163,24 @@ def analyze_text_content(text):
             return match.group(0).replace('\n', '').replace('  ',' ')
         else:
             return None
+
+    # Call your extraction functions and return the extracted information
+    case_number = extract_case_number(text)
+    decision_date, decision_date_unix = extract_decision_date(text)
+    guiding_principles = extract_guiding_principles(text)
+    motion_category = extract_motion_category(text)
+    tenor_text = extract_tenor(text)
+    court_decision = analyze_court_decision(tenor_text)
+    senat = extract_senat(text)
+
+    # Return both the extracted text and the extracted information
+    return text, {
+        "case_number": case_number,
+        "decision_date": decision_date,
+        "guiding_principles": guiding_principles,
+        "motion_category": motion_category,
+        "court_decision": court_decision,
+        "senat": senat,
+        "decision_date_unix": decision_date_unix
+    }
+
