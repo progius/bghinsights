@@ -1,5 +1,6 @@
 # IMPORTS
 import re
+import os
 from pdf_processor import process_pdf
 from datetime import datetime
 
@@ -49,6 +50,8 @@ senat_regex = re.compile(senat_pattern)
 
 # Function to analyze the extracted text content to extract various pieces of information
 def analyze_text_content(file_path):
+    # Extract the file name from the file path
+    file_name = os.path.basename(file_path)
 
     # Process the PDF and extract text
     text = process_pdf(file_path)
@@ -175,6 +178,7 @@ def analyze_text_content(file_path):
 
     # Return both the extracted text and the extracted information
     return text, {
+        "file_name": file_name,
         "case_number": case_number,
         "decision_date": decision_date,
         "guiding_principles": guiding_principles,
@@ -183,4 +187,3 @@ def analyze_text_content(file_path):
         "senat": senat,
         "decision_date_unix": decision_date_unix
     }
-

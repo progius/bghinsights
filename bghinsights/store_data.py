@@ -61,6 +61,7 @@ def save_to_json_files(directory_path):
             # Add the extracted data to the list
             all_data.append({
                 "id": md5_int,
+                "file_name": analyzed_content.get("file_name"),
                 "extracted_text": extracted_text,
                 "case_number": analyzed_content.get("case_number"),
                 "decision_date_unix": analyzed_content.get("decision_date_unix"),
