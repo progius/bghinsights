@@ -33,8 +33,8 @@ def connect_to_azure_storage():
     
     return fs
 
-# Function to save the extracted text and various information into a Merged JSON File
-def save_to_json_files(directory_path):
+# Function to save the extracted text and various information into a Merged JSON File when using it locally
+def save_json_to_local(directory_path):
     # Initialize an empty list to store the extracted data from each PDF file
     all_data = []
 
@@ -44,6 +44,7 @@ def save_to_json_files(directory_path):
             file_path = os.path.join(directory_path, filename)
             
             # Analyze the text content of the PDF
+            print(f"Processing file: {filename}")
             extracted_text, analyzed_content = analyze_text_content(file_path)
 
             # Check if the analysis was successful
@@ -88,6 +89,75 @@ def save_to_json_files(directory_path):
             json.dump(all_data, json_file, ensure_ascii=False, indent=4)
         
         print(f"All data saved to {output_file_path}")
+
+    except Exception as e:
+        # Log any errors that occur during file saving
+        print(f"Error saving JSON file: {e}")
+        traceback.print_exc()  # Print the traceback for detailed error information
+
+# Function to save the extracted text and various information into a Merged JSON File when using it with Azure Container Blob Storage
+def save_json_to_azure(fs, container_name):
+    # Initialize an empty list to store the extracted data from each PDF file
+    all_data = []
+
+    # Check if fs is an AzureBlobFileSystem instance
+    if isinstance(fs, AzureBlobFileSystem):
+        # Iterate over each file in the container
+        for filename in fs.ls(container_name):
+            if filename.endswith(".pdf"):
+                with fs.open(filename, 'rb') as file_obj:  # Open the file
+                    # Analyze the text content of the PDF
+                    print(f"Processing file: {filename}")
+                    extracted_text, analyzed_content = analyze_text_content(file_obj)
+
+                    # Check if the analysis was successful
+                    if analyzed_content and extracted_text is not None:
+                        # Compute MD5 hash of the extracted text
+                        md5_hash = hashlib.md5(extracted_text.encode()).hexdigest()
+                        # Use the first 8 characters of the MD5 hash
+                        md5_short = md5_hash[:15]
+                        # Convert MD5 hash to integer
+                        md5_int = int(md5_short, 16)
+
+                        # Add the extracted data to the list with the MD5 hash as an identifier
+                        analyzed_content["id"] = md5_int
+                        all_data.append(analyzed_content)
+                    else:
+                        print(f"Analysis failed for file: {filename}")
+    else:  # Assuming it's a local file system
+        # Iterate over each file in the directory
+        for filename in os.listdir(container_name):
+            if filename.endswith(".pdf"):
+                file_path = os.path.join(container_name, filename)
+                with open(file_path, 'rb') as file_obj:  # Open the file
+                    # Analyze the text content of the PDF
+                    print(f"Processing file: {filename}")
+                    extracted_text, analyzed_content = analyze_text_content(file_obj)
+
+                    # Check if the analysis was successful
+                    if analyzed_content and extracted_text is not None:
+                        # Compute MD5 hash of the extracted text
+                        md5_hash = hashlib.md5(extracted_text.encode()).hexdigest()
+                        # Use the first 8 characters of the MD5 hash
+                        md5_short = md5_hash[:15]
+                        # Convert MD5 hash to integer
+                        md5_int = int(md5_short, 16)
+
+                        # Add the extracted data to the list with the MD5 hash as an identifier
+                        analyzed_content["id"] = md5_int
+                        all_data.append(analyzed_content)
+                    else:
+                        print(f"Analysis failed for file: {filename}")
+
+    # Define the output JSON file path within the container
+    output_blob_path = f"{container_name}/extracted_json/all_data.json"
+
+    # Save all the data to a single JSON file in the container
+    try:
+        with fs.open(output_blob_path, 'wb') as json_blob:
+            json_blob.write(json.dumps(all_data, ensure_ascii=False, indent=4).encode('utf-8'))
+        
+        print(f"All data saved to {output_blob_path}")
 
     except Exception as e:
         # Log any errors that occur during file saving

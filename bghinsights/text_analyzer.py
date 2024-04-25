@@ -49,17 +49,26 @@ senat_pattern = r"Große\s+Senat\s+für\s+Zivilsachen|Große\s+Senat\s+für\s+St
 senat_regex = re.compile(senat_pattern)
 
 # Function to analyze the extracted text content to extract various pieces of information
-def analyze_text_content(file_path):
-    # Extract the file name from the file path
-    file_name = os.path.basename(file_path)
+def analyze_text_content(file_obj):
+    if hasattr(file_obj, 'read'):  # Check if file_obj is a file-like object
+        # Extract the file name directly from the file object
+        if hasattr(file_obj, 'name'):
+            file_name = os.path.basename(file_obj.name)
+        else:
+            file_name = "unknown_file.pdf"  # Provide a default name if the file object doesn't have a name attribute
+    elif isinstance(file_obj, str):  # Check if file_obj is a string (file path)
+        # Extract the file name from the file path
+        file_name = os.path.basename(file_obj)
+    else:
+        raise ValueError("Invalid file object provided.")
 
     # Process the PDF and extract text
-    text = process_pdf(file_path)
+    text = process_pdf(file_obj)
 
     if not text or not text.strip():
-        print(f"The file {file_path} contains no text or text extraction failed.")
+        print(f"The file {file_obj.path} contains no text or text extraction failed.")
         return None, None
-
+    
     def extract_motion_category(text):
         pattern = re.compile(motion_category_pattern, re.IGNORECASE | re.DOTALL)
 
@@ -138,10 +147,10 @@ def analyze_text_content(file_path):
                 # Convert the decision date to UNIX timestamp
                 decision_date_unix = int(decision_date_obj.timestamp())
             except ValueError:
-                print(f"Error parsing 'decision_date' for file: {file_path}")
+                print(f"Error parsing 'decision_date' for file: {file_obj}")
                 decision_date_unix = None
         else:
-            print(f"No decision date found in the text for file: {file_path}")
+            print(f"No decision date found in the text for file: {file_obj}")
             decision_date_str = None
             decision_date_unix = None
 
@@ -176,7 +185,6 @@ def analyze_text_content(file_path):
     court_decision = analyze_court_decision(tenor_text)
     senat = extract_senat(text)
 
-    # Return both the extracted text and the extracted information
     return text, {
         "file_name": file_name,
         "case_number": case_number,
@@ -185,5 +193,6 @@ def analyze_text_content(file_path):
         "motion_category": motion_category,
         "court_decision": court_decision,
         "senat": senat,
-        "decision_date_unix": decision_date_unix
+        "decision_date_unix": decision_date_unix,
+        "extracted_text": text  # Include the extracted text in the output dictionary
     }
