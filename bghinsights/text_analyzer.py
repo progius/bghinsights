@@ -49,134 +49,111 @@ senat_pattern = r"Große\s+Senat\s+für\s+Zivilsachen|Große\s+Senat\s+für\s+St
 senat_regex = re.compile(senat_pattern)
 
 # Function to analyze the extracted text content to extract various pieces of information
-def analyze_text_content(file_obj):
+# Function to extract the file name
+def extract_file_name(file_obj):
     if hasattr(file_obj, 'read'):  # Check if file_obj is a file-like object
         # Extract the file name directly from the file object
         if hasattr(file_obj, 'name'):
-            file_name = os.path.basename(file_obj.name)
+            return os.path.basename(file_obj.name)
         else:
-            file_name = "unknown_file.pdf"  # Provide a default name if the file object doesn't have a name attribute
+            return "unknown_file.pdf"  # Provide a default name if the file object doesn't have a name attribute
     elif isinstance(file_obj, str):  # Check if file_obj is a string (file path)
         # Extract the file name from the file path
-        file_name = os.path.basename(file_obj)
+        return os.path.basename(file_obj)
     else:
         raise ValueError("Invalid file object provided.")
 
-    # Process the PDF and extract text
-    text = process_pdf(file_obj)
+# Function to extract the case number
+def extract_case_number(text):
+    pattern = re.compile(case_number_pattern, re.IGNORECASE)
+    match = pattern.search(text)
+    if match:
+        return match.group(0)
+    else:
+        return None
+
+# Function to extract the decision date
+def extract_decision_date(text):
+    match = re.search(decision_date_pattern, text)
+    if match:
+        decision_date_str = match.group(1)
+        for month_name, month_number in month_mapping.items():
+            if month_name in decision_date_str:
+                decision_date_str = decision_date_str.replace(month_name, month_number)
+                break
+        try:
+            decision_date_obj = datetime.strptime(decision_date_str, "%d. %m %Y")
+            decision_date_unix = int(decision_date_obj.timestamp())
+        except ValueError:
+            print("Error parsing 'decision_date'")
+            decision_date_unix = None
+    else:
+        decision_date_str = None
+        decision_date_unix = None
+    return decision_date_str, decision_date_unix
+
+# Function to extract guiding principles
+def extract_guiding_principles(text):
+    pattern = re.compile(guiding_principles_pattern, re.IGNORECASE | re.DOTALL)
+    match = pattern.search(text)
+    if match:
+        return "Ja"
+    else:
+        return "Nein"
+
+# Function to extract motion category
+def extract_motion_category(text):
+    pattern = re.compile(motion_category_pattern, re.IGNORECASE | re.DOTALL)
+    matches = pattern.findall(text)
+    if matches:
+        processed_matches = ["Nichtzulassungsbeschwerde" if "Beschwerde" in match else match for match in matches]
+        return processed_matches[0]
+    else:
+        return None
+
+# Function to extract tenor text
+def extract_tenor(text):
+    matches = re.search(tenor_pattern, text, re.IGNORECASE | re.DOTALL)
+    if matches:
+        return matches.group(2).strip()
+    else:
+        return None
+
+# Function to analyze court decision
+def analyze_court_decision(tenor_text):
+    if tenor_text is None:
+        return ""
+    normalized_text = ' '.join(tenor_text.split())
+    has_winning_keywords = bool(re.search(winning_keywords, normalized_text))
+    has_losing_keywords = bool(re.search(losing_keywords, normalized_text))
+    if has_winning_keywords and not has_losing_keywords:
+        return "Gewonnen"
+    elif not has_winning_keywords and has_losing_keywords:
+        return "Verloren"
+    else:
+        return ""
+
+# Function to extract the sena
+def extract_senat(text):
+    match = senat_regex.search(text)
+    if match:
+        return match.group(0).replace('\n', '').replace('  ',' ')
+    else:
+        return None
+
+# Wrapper function to analyze text content
+def analyze_text_content(file_obj):
+    if isinstance(file_obj, str):
+        with open(file_obj, 'rb') as file:
+            text = process_pdf(file)
+    else:
+        text = process_pdf(file_obj)
 
     if not text or not text.strip():
         print(f"The file {file_obj.path} contains no text or text extraction failed.")
         return None, None
-    
-    def extract_motion_category(text):
-        pattern = re.compile(motion_category_pattern, re.IGNORECASE | re.DOTALL)
 
-        # Search for the pattern in the text
-        matches = pattern.findall(text)
-
-        # Check if matches were found
-        if matches:
-            # Process the matches to replace "Beschwerde ... Nichtzulassung" with "Nichtzulassungsbeschwerde"
-            processed_matches = ["Nichtzulassungsbeschwerde" if "Beschwerde" in match else match for match in matches]
-            return processed_matches[0]
-        else:
-            return None
-    
-    # Extracting Tenor to isolate the decision of the case
-    def extract_tenor(text):
-         # Search for the pattern in the text
-        matches = re.search(tenor_pattern, text, re.IGNORECASE | re.DOTALL)
-
-        if matches:
-            # Extract the tenor text from the matched groups
-            tenor_text = matches.group(2).strip()
-            return tenor_text
-        else:
-            # If no match is found, return None
-            return None
-    
-    # Function to analyze the court decision inside the tenor
-    def analyze_court_decision(tenor_text):
-        if tenor_text is None:
-            return ""
-        # Normalize the text to remove any variations in spacing or line breaks
-        normalized_text = ' '.join(tenor_text.split())
-
-        # Flags to indicate the presence of winning or losing keywords
-        has_winning_keywords = bool(re.search(winning_keywords, normalized_text))
-        has_losing_keywords = bool(re.search(losing_keywords, normalized_text))
-
-        # Determine the decision result based on the keywords found
-        if has_winning_keywords and not has_losing_keywords:
-            return "Gewonnen"
-        elif not has_winning_keywords and has_losing_keywords:
-            return "Verloren"
-        else:
-            return "" # Return NONE or empty string if it does not contain any keywords
-        
-    def extract_case_number(text):
-        pattern = re.compile(case_number_pattern, re.IGNORECASE)
-        match = pattern.search(text)
-        if match:
-            return match.group(0)
-        else:
-            return None
-
-    def extract_decision_date(text):
-        # Define the regular expression pattern for the decision date
-        decision_date_pattern = r"(?:Verkündet am:|vom)\s*(\d{1,2}\.\s*(?:Januar|Februar|März|April|Mai|Juni|Juli|August|September|Oktober|November|Dezember)\s*\d{4})"
-
-        # Search for the decision date pattern in the text
-        match = re.search(decision_date_pattern, text)
-
-        if match:
-            # Extract the decision date string
-            decision_date_str = match.group(1)
-
-            # Convert the month name to its numerical representation
-            for month_name, month_number in month_mapping.items():
-                if month_name in decision_date_str:
-                    decision_date_str = decision_date_str.replace(month_name, month_number)
-                    break
-
-            try:
-                # Parse the decision date string into a datetime object
-                decision_date_obj = datetime.strptime(decision_date_str, "%d. %m %Y")
-
-                # Convert the decision date to UNIX timestamp
-                decision_date_unix = int(decision_date_obj.timestamp())
-            except ValueError:
-                print(f"Error parsing 'decision_date' for file: {file_obj}")
-                decision_date_unix = None
-        else:
-            print(f"No decision date found in the text for file: {file_obj}")
-            decision_date_str = None
-            decision_date_unix = None
-
-        return decision_date_str, decision_date_unix
-
-    def extract_guiding_principles(text):
-        # Define the regular expression pattern to search for guiding principles
-        pattern = re.compile(guiding_principles_pattern, re.IGNORECASE | re.DOTALL)
-        
-        # Search for the pattern in the text
-        match = pattern.search(text)
-        
-        # If a match is found, return "Ja"; otherwise, return "Nein"
-        if match:
-            return "Ja"
-        else:
-            return "Nein"
-    
-    def extract_senat(text):
-        match = senat_regex.search(text)
-        if match:
-            return match.group(0).replace('\n', '').replace('  ',' ')
-        else:
-            return None
-
-    # Call your extraction functions and return the extracted information
+    file_name = extract_file_name(file_obj)
     case_number = extract_case_number(text)
     decision_date, decision_date_unix = extract_decision_date(text)
     guiding_principles = extract_guiding_principles(text)
@@ -194,5 +171,5 @@ def analyze_text_content(file_obj):
         "court_decision": court_decision,
         "senat": senat,
         "decision_date_unix": decision_date_unix,
-        "extracted_text": text  # Include the extracted text in the output dictionary
+        "extracted_text": text
     }
