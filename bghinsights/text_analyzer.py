@@ -1,7 +1,7 @@
 # IMPORTS
 import re
 import os
-from pdf_processor import process_pdf
+import hashlib
 from datetime import datetime
 
 # Mapping of German month names to numerical representations
@@ -49,19 +49,6 @@ senat_pattern = r"Große\s+Senat\s+für\s+Zivilsachen|Große\s+Senat\s+für\s+St
 senat_regex = re.compile(senat_pattern)
 
 # Function to analyze the extracted text content to extract various pieces of information
-# Function to extract the file name
-def extract_file_name(file_obj):
-    if hasattr(file_obj, 'read'):  # Check if file_obj is a file-like object
-        # Extract the file name directly from the file object
-        if hasattr(file_obj, 'name'):
-            return os.path.basename(file_obj.name)
-        else:
-            return "unknown_file.pdf"  # Provide a default name if the file object doesn't have a name attribute
-    elif isinstance(file_obj, str):  # Check if file_obj is a string (file path)
-        # Extract the file name from the file path
-        return os.path.basename(file_obj)
-    else:
-        raise ValueError("Invalid file object provided.")
 
 # Function to extract the case number
 def extract_case_number(text):
@@ -141,19 +128,11 @@ def extract_senat(text):
     else:
         return None
 
-# Wrapper function to analyze text content
-def analyze_text_content(file_obj):
-    if isinstance(file_obj, str):
-        with open(file_obj, 'rb') as file:
-            text = process_pdf(file)
-    else:
-        text = process_pdf(file_obj)
-
+def analyze_text_content(text, filename=None):
     if not text or not text.strip():
-        print(f"The file {file_obj.path} contains no text or text extraction failed.")
-        return None, None
+        print("The extracted text is empty or extraction failed.")
+        return None
 
-    file_name = extract_file_name(file_obj)
     case_number = extract_case_number(text)
     decision_date, decision_date_unix = extract_decision_date(text)
     guiding_principles = extract_guiding_principles(text)
@@ -162,8 +141,18 @@ def analyze_text_content(file_obj):
     court_decision = analyze_court_decision(tenor_text)
     senat = extract_senat(text)
 
-    return text, {
-        "file_name": file_name,
+    # Compute MD5 hash of the extracted text
+    md5_hash = hashlib.md5(text.encode()).hexdigest()
+    # Use the first 8 characters of the MD5 hash
+    md5_short = md5_hash[:15]
+    # Convert MD5 hash to integer
+    md5_int = int(md5_short, 16)
+
+    if filename is not None:
+        filename = os.path.basename(filename)
+
+    return {
+        "id": md5_int,
         "case_number": case_number,
         "decision_date": decision_date,
         "guiding_principles": guiding_principles,
@@ -171,5 +160,6 @@ def analyze_text_content(file_obj):
         "court_decision": court_decision,
         "senat": senat,
         "decision_date_unix": decision_date_unix,
-        "extracted_text": text
+        "extracted_text": text,
+        "filename": filename
     }
